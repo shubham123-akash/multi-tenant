@@ -15,6 +15,7 @@ const userSchema = new mongoose.Schema({
     email: {
       type: String,
       required: true,
+      unique : true
     },
 
     password: {
@@ -33,9 +34,6 @@ const userSchema = new mongoose.Schema({
       default: true
     }
 }, { timestamps: true });
-
-// userSchema.index({ email: 1, tenantId: 1 }, { unique: true });
-
 
 const User = mongoose.model("User", userSchema);
 export default User;
