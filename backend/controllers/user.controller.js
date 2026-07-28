@@ -133,10 +133,12 @@ export const createUser = async (req, res) => {
       })
     }
 
-    if(role == "OWNER"){
-      return res.status(401).json({
-        message: "owner already exists"
-      })
+    const allowedRoles = ["ADMIN", "MEMBER"];
+
+    if (!allowedRoles.includes(role)) {
+      return res.status(400).json({
+        message: "Invalid role"
+      });
     }
 
     const existingUser = await User.findOne({
