@@ -1,0 +1,130 @@
+import React, { useEffect, useState } from "react";
+import axios from "axios";
+import toast from "react-hot-toast";
+import { ACTIVITY_API_END_POINT, USER_API_END_POINT } from "../utils/Constant";
+
+const Activity = () => {
+
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [role, setRole] = useState("");
+
+  // 🔥 Fetch logged-in user role
+  const fetchUser = async () => {
+    try {
+      const res = await axios.get(
+        `${USER_API_END_POINT}/me`,
+        { withCredentials: true }
+      );
+      setRole(res.data.role);
+    } catch (error) {
+      toast.error("Failed to fetch user");
+    }
+  };
+
+  // 🔥 Fetch activity logs
+  const fetchLogs = async () => {
+    try {
+      setLoading(true);
+
+      const res = await axios.get(
+        `${ACTIVITY_API_END_POINT}/getLogs`,
+        { withCredentials: true }
+      );
+
+      setLogs(res.data);
+
+    } catch (error) {
+      toast.error("Failed to fetch activity logs");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUser();
+    fetchLogs();
+  }, []);
+
+  // 🔹 Format Action Text
+  const formatAction = (action) => {
+    return action.replaceAll("_", " ");
+  };
+
+  // 🔹 Badge Styling
+  const getEntityStyle = (type) => {
+    return type === "PROJECT"
+      ? "bg-blue-100 text-blue-600"
+      : "bg-purple-100 text-purple-600";
+  };
+
+  // 🔒 Block MEMBER
+  if (role === "MEMBER") {
+    return (
+      <div className="p-6 text-gray-500">
+        You do not have permission to view activity logs.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+
+      <div>
+        <h1 className="text-3xl font-bold text-gray-800">
+          Activity Logs
+        </h1>
+        <p className="text-gray-500 mt-1">
+          Track all important actions inside your tenant
+        </p>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-md p-6">
+
+        {loading ? (
+          <p className="text-gray-400">Loading logs...</p>
+        ) : logs.length === 0 ? (
+          <p className="text-gray-400">No activity found</p>
+        ) : (
+          <ul className="space-y-4">
+
+            {logs.map((log) => (
+              <li
+                key={log._id}
+                className="border-b pb-3 flex justify-between items-start"
+              >
+                <div>
+
+                  <p className="font-medium text-gray-800">
+                    {formatAction(log.action)}
+                  </p>
+
+                  <p className="text-sm text-gray-500">
+                    By {log.performedBy?.name} ({log.performedBy?.role})
+                  </p>
+
+                  <span
+                    className={`inline-block mt-1 px-2 py-1 rounded-full text-xs font-semibold ${getEntityStyle(log.entityType)}`}
+                  >
+                    {log.entityType}
+                  </span>
+
+                </div>
+
+                <span className="text-xs text-gray-400">
+                  {new Date(log.createdAt).toLocaleString()}
+                </span>
+
+              </li>
+            ))}
+
+          </ul>
+        )}
+
+      </div>
+
+    </div>
+  );
+};
+
+export default Activity;
