@@ -5,9 +5,19 @@ const StatsCards = ({
   setView
 }) => {
 
-  const activeProjects = projects.filter(p => p.status === "ACTIVE");
-  const archivedProjects = projects.filter(p => p.status === "ARCHIVED");
-  const completedProjects = projects.filter(p => p.status === "COMPLETED");
+  const projectList = Array.isArray(projects) ? projects : [];
+
+const activeProjects = projectList.filter(
+    p => p.status === "ACTIVE"
+);
+
+const archivedProjects = projectList.filter(
+    p => p.status === "ARCHIVED"
+);
+
+const completedProjects = projectList.filter(
+    p => p.status === "COMPLETED"
+);
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
@@ -30,7 +40,7 @@ const StatsCards = ({
       >
         <h2 className="text-gray-500 text-sm">Total Projects</h2>
         <p className="text-2xl font-bold text-blue-600 mt-2">
-          {projects.length}
+          {projectList.length}
         </p>
       </div>
 

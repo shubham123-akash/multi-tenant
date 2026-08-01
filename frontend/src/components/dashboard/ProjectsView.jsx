@@ -1,4 +1,6 @@
-const ProjectsView = ({ projects }) => {
+const ProjectsView = ({ projects = [] }) => {
+
+  const projectList = Array.isArray(projects) ? projects : [];
 
   const getStatusStyle = (status) => {
     switch (status) {
@@ -16,14 +18,14 @@ const ProjectsView = ({ projects }) => {
   return (
     <div className="bg-white p-6 rounded-xl shadow-md">
       <h2 className="text-lg font-semibold mb-4 text-gray-700">
-        All Projects ({projects.length})
+        All Projects ({projectList.length})
       </h2>
 
-      {projects.length === 0 ? (
+      {projectList.length === 0 ? (
         <p className="text-gray-400">No projects found</p>
       ) : (
         <div className="space-y-3">
-          {projects.map((project) => (
+          {projectList.map((project) => (
             <div
               key={project._id}
               className="flex justify-between border-b pb-2"
@@ -32,6 +34,7 @@ const ProjectsView = ({ projects }) => {
                 <p className="font-medium text-gray-800">
                   {project.name}
                 </p>
+
                 <p className="text-sm text-gray-500">
                   Created on{" "}
                   {new Date(project.createdAt).toLocaleDateString()}
@@ -39,7 +42,9 @@ const ProjectsView = ({ projects }) => {
               </div>
 
               <span
-                className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusStyle(project.status)}`}
+                className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusStyle(
+                  project.status
+                )}`}
               >
                 {project.status}
               </span>

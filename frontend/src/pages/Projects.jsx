@@ -38,7 +38,7 @@ const Projects = () => {
         `${PROJECT_API_END_POINT}/getAllProjects`,
         { withCredentials: true }
       );
-      setProjects(res.data);
+      setProjects(res.data.projects);
     } catch (error) {
       toast.error("Failed to fetch projects");
     } finally {

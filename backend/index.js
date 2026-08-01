@@ -7,6 +7,7 @@ import projectRouter from "./routes/project.route.js";
 import tenantRouter from "./routes/tenant.route.js";
 import cors from "cors";
 import activityRouter from "./routes/activity.route.js";
+import projectMemberRoute from "./routes/projectMember.route.js";
 
 const app = express();
 
@@ -31,6 +32,7 @@ app.use("/api/v1/users", userRouter);
 app.use("/api/v1/projects", projectRouter);
 app.use("/api/v1/tenants", tenantRouter);
 app.use("/api/v1/activity", activityRouter);
+app.use("/api/v1/project-member", projectMemberRoute);
 
 
 app.listen(process.env.PORT, () => {

@@ -28,10 +28,15 @@ const Dashboard = () => {
       axios.get(`${USER_API_END_POINT}/me`, { withCredentials: true })
     ]);
 
+    console.log("Tenant Response:", tenantRes.data);
+console.log("Project Response:", projectRes.data);
+console.log("User Response:", userRes.data);
+console.log("Me Response:", meRes.data);
+
     setTenant(tenantRes.data);
-    setProjects(projectRes.data);
-    setUsers(userRes.data);
-    setRole(meRes.data.role);
+setProjects(projectRes.data.projects); // ✅
+setUsers(userRes.data);                // ✅
+setRole(meRes.data.role);
   };
 
   useEffect(() => {

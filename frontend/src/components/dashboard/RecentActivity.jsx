@@ -1,6 +1,8 @@
-const RecentActivity = ({ projects }) => {
+const RecentActivity = ({ projects = [] }) => {
 
-  const recentProjects = [...projects]
+  const projectList = Array.isArray(projects) ? projects : [];
+
+  const recentProjects = [...projectList]
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
     .slice(0, 5);
 
@@ -37,12 +39,15 @@ const RecentActivity = ({ projects }) => {
                   {project.name}
                 </p>
                 <p className="text-sm text-gray-500">
-                  Created on {new Date(project.createdAt).toLocaleDateString()}
+                  Created on{" "}
+                  {new Date(project.createdAt).toLocaleDateString()}
                 </p>
               </div>
 
               <span
-                className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusStyle(project.status)}`}
+                className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusStyle(
+                  project.status
+                )}`}
               >
                 {project.status}
               </span>

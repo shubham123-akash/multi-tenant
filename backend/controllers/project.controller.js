@@ -1,5 +1,6 @@
 import Project from "../models/project.model.js";
 import { createActivityLog } from "../utils/createActivityLog.js";
+import ProjectMember from "../models/projectMember.model.js";
 
 
 // create Project
@@ -45,27 +46,55 @@ export const createProject = async(req, res) => {
 }
 
 
-// Get All Projects (Active + Archived)
+// Get All Projects
+
 export const getAllProjects = async (req, res) => {
   try {
-
     if (!req.user || !req.user.tenantId) {
       return res.status(401).json({
+        success: false,
         message: "Unauthorized",
-        success: false
       });
     }
 
-    const projects = await Project.find({
-      tenantId: req.user.tenantId
+    let projects;
+
+    // OWNER & ADMIN -> All Projects
+    if (req.user.role === "OWNER" || req.user.role === "ADMIN") {
+      projects = await Project.find({
+        tenantId: req.user.tenantId,
+      });
+    }
+
+    // MEMBER -> Only Assigned Projects
+    else if (req.user.role === "MEMBER") {
+
+      const memberships = await ProjectMember.find({
+        tenantId: req.user.tenantId,
+        userId: req.user.userId,
+        status: "ACTIVE",
+      });
+
+      const projectIds = memberships.map(member => member.projectId);
+
+      projects = await Project.find({
+        _id: { $in: projectIds },
+        tenantId: req.user.tenantId,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      totalProjects: projects.length,
+      projects,
     });
 
-    return res.status(200).json(projects);
-
   } catch (error) {
+    console.error(error);
+
     return res.status(500).json({
+      success: false,
       message: "Failed to fetch projects",
-      success: false
     });
   }
 };

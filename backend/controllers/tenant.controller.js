@@ -33,16 +33,16 @@ export const getTenantInformation = async (req, res) => {
 
 
 // get all tenants
-export const getAllTenants = async (req, res) => {
-  try {
+// export const getAllTenants = async (req, res) => {
+//   try {
 
-    const tenants = await Tenant.find().sort({ createdAt: -1 });
+//     const tenants = await Tenant.find().sort({ createdAt: -1 });
 
-    res.status(200).json(tenants);
+//     res.status(200).json(tenants);
 
-  } catch (error) {
-    res.status(500).json({
-      message: "Failed to fetch tenants"
-    });
-  }
-};
+//   } catch (error) {
+//     res.status(500).json({
+//       message: "Failed to fetch tenants"
+//     });
+//   }
+// };

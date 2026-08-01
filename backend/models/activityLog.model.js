@@ -9,7 +9,7 @@ const activityLogSchema = new mongoose.Schema({
 
   entityType: {
     type: String,
-    enum: ["PROJECT", "USER"],
+    enum: ["PROJECT", "USER", "PROJECT_MEMBER", "TASK"],
     required: true
   },
 
