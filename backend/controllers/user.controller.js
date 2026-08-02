@@ -132,16 +132,16 @@ export const createUser = async (req, res) => {
 
     const { name, email, password, role } = req.body;
 
-    if(password.length < 6){
-      return res.status(400).json({
-        message: "Password must be at least 6 characters long"
-      })
-    }
-
     if(!name || !email || !password || !role){
       return res.status(400).json({
         message: "All fields are required",
         success: false
+      })
+    }
+
+    if(password.length < 6){
+      return res.status(400).json({
+        message: "Password must be at least 6 characters long"
       })
     }
 
