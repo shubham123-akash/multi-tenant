@@ -3,10 +3,14 @@ import ProjectMember from "../models/projectMember.model.js";
 import User from "../models/user.model.js";
 import { createActivityLog } from "../utils/createActivityLog.js";
 
-// Assign User to Project
+
+
+
 export const assignUser = async (req, res) => {
   try {
     const { projectId, userId, role } = req.body;
+
+    // Required Fields
 
     if (!projectId || !userId) {
       return res.status(400).json({
@@ -15,6 +19,7 @@ export const assignUser = async (req, res) => {
       });
     }
 
+    // Project Role Validation
 
     const projectRole = (role || "MEMBER").toUpperCase();
 
@@ -25,7 +30,7 @@ export const assignUser = async (req, res) => {
       });
     }
 
-    // CHECK PROJECT
+    // Check Project
 
     const project = await Project.findOne({
       _id: projectId,
@@ -39,7 +44,7 @@ export const assignUser = async (req, res) => {
       });
     }
 
-    // PROJECT STATUS CHECK
+    // Project must be ACTIVE
 
     if (project.status !== "ACTIVE") {
       return res.status(400).json({
@@ -48,7 +53,7 @@ export const assignUser = async (req, res) => {
       });
     }
 
-    // CHECK USER
+    // Check User
 
     const user = await User.findOne({
       _id: userId,
@@ -62,7 +67,7 @@ export const assignUser = async (req, res) => {
       });
     }
 
-    // ROLE HIERARCHY
+    // Role Hierarchy
 
     // MEMBER cannot assign anyone
     if (req.user.role === "MEMBER") {
@@ -72,53 +77,40 @@ export const assignUser = async (req, res) => {
       });
     }
 
-    // ADMIN can assign only MEMBER users
-    if (
-      req.user.role === "ADMIN" &&
-      user.role !== "MEMBER"
-    ) {
+    // OWNER and ADMIN can assign ONLY MEMBER users
+    if (user.role !== "MEMBER") {
       return res.status(403).json({
         success: false,
-        message: "Admins can assign only MEMBER users.",
+        message: "Only users with MEMBER role can be assigned to a project.",
       });
     }
 
-    // OWNER cannot assign another OWNER
-    if (
-      req.user.role === "OWNER" &&
-      user.role === "OWNER"
-    ) {
-      return res.status(403).json({
-        success: false,
-        message: "Owners cannot assign other Owners.",
-      });
-    }
-
-    // PREVENT DUPLICATE ASSIGNMENT
+    // Prevent Duplicate Assignment
 
     const alreadyAssigned = await ProjectMember.findOne({
       projectId,
       userId,
+      status: "ACTIVE",
     });
 
     if (alreadyAssigned) {
       return res.status(400).json({
         success: false,
-        message: "User is already assigned to this project",
+        message: "User is already assigned to this project.",
       });
     }
 
-    // ASSIGN USER
+    // Assign User
 
     const projectMember = await ProjectMember.create({
       projectId,
       userId,
       tenantId: req.user.tenantId,
       assignedBy: req.user.userId,
-      role: role || "MEMBER", // Project Role (MANAGER / MEMBER)
+      role: projectRole,
     });
 
-    // ACTIVITY LOG
+    // Activity Log
 
     await createActivityLog({
       action: "USER_ASSIGNED_TO_PROJECT",
@@ -128,18 +120,20 @@ export const assignUser = async (req, res) => {
       tenantId: req.user.tenantId,
     });
 
+    // Response
+
     return res.status(201).json({
       success: true,
-      message: "User assigned successfully",
+      message: "User assigned successfully.",
       projectMember,
     });
 
   } catch (error) {
-    console.log(error);
+    console.error(error);
 
     return res.status(500).json({
       success: false,
-      message: "Failed to assign user",
+      message: "Failed to assign user.",
     });
   }
 };

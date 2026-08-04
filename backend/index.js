@@ -8,6 +8,7 @@ import tenantRouter from "./routes/tenant.route.js";
 import cors from "cors";
 import activityRouter from "./routes/activity.route.js";
 import projectMemberRoute from "./routes/projectMember.route.js";
+import taskRoute from "./routes/task.route.js";
 
 const app = express();
 
@@ -33,6 +34,7 @@ app.use("/api/v1/projects", projectRouter);
 app.use("/api/v1/tenants", tenantRouter);
 app.use("/api/v1/activity", activityRouter);
 app.use("/api/v1/project-member", projectMemberRoute);
+app.use("/api/v1/tasks", taskRoute);
 
 
 app.listen(process.env.PORT, () => {
