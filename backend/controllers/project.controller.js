@@ -204,6 +204,21 @@ export const updateProjectStatus = async (req, res) => {
       });
     }
 
+    const allowedTransitions = {
+      ACTIVE: ["ARCHIVED"],
+      ARCHIVED: ["COMPLETED"],
+      COMPLETED: [],
+    };
+
+    const nextStatuses = allowedTransitions[currentStatus] || [];
+
+    if (!nextStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: `Project cannot move from ${currentStatus} to ${status}.`,
+      });
+    }
+
     project.status = status;
     await project.save();
 
