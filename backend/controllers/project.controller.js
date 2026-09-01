@@ -1,6 +1,7 @@
 import Project from "../models/project.model.js";
 import { createActivityLog } from "../utils/createActivityLog.js";
 import ProjectMember from "../models/projectMember.model.js";
+import Task from "../models/task.model.js";
 
 
 // create Project
@@ -144,11 +145,47 @@ export const deleteProject = async(req, res) => {
     });
   
     if(!project){
-      return res.status(401).json({
+      return res.status(404).json({
         message: "project not found",
         success: false
       })
     }
+
+  //   const project = await Project.findOne({
+  //     _id: projectId,
+  //     tenantId: req.user.tenantId
+  //   });
+
+  // if (!project) {
+  //   return res.status(404).json({
+  //     message: "Project not found",
+  //     success: false
+  //   });
+  // }
+
+  // const activeTaskCount = await Task.countDocuments({
+  //   projectId,
+  //   tenantId: req.user.tenantId,
+  //   isDeleted: false,
+  //   status: { $ne: "DONE" }
+  // });
+
+  // const memberCount = await ProjectMember.countDocuments({
+  //   projectId,
+  //   tenantId: req.user.tenantId
+  // });
+
+  // if (activeTaskCount > 0 || memberCount > 0) {
+  //   return res.status(400).json({
+  //     message: "Project cannot be deleted while it has active tasks or members",
+  //     success: false
+  //   });
+  // }
+
+  // await Project.deleteOne({
+  //   _id: projectId,
+  //   tenantId: req.user.tenantId
+  // });
 
     await createActivityLog({
       action: "PROJECT_DELETED",
@@ -158,7 +195,7 @@ export const deleteProject = async(req, res) => {
       tenantId: req.user.tenantId
     });
   
-    return res.status(201).json({
+    return res.status(200).json({
       message: "Project deleted successfully"
     })
   } catch(error){

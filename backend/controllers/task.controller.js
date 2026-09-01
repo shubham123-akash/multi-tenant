@@ -1,5 +1,6 @@
 import Task from "../models/task.model.js";
 import { createActivityLog } from "../utils/createActivityLog.js";
+import ProjectMember from "../models/projectMember.model.js";
 
 export const createTask = async (req, res) => {
   try {
@@ -13,9 +14,7 @@ export const createTask = async (req, res) => {
       estimatedHours,
     } = req.body;
 
-    // ======================================
     // Required Fields
-    // ======================================
 
     if (!title) {
       return res.status(400).json({
@@ -24,9 +23,7 @@ export const createTask = async (req, res) => {
       });
     }
 
-    // ======================================
     // Create Task
-    // ======================================
 
     const task = await Task.create({
       tenantId: req.user.tenantId,
@@ -40,18 +37,14 @@ export const createTask = async (req, res) => {
       estimatedHours: estimatedHours || 0,
     });
 
-    // ======================================
     // Populate Task
-    // ======================================
 
     const populatedTask = await Task.findById(task._id)
       .populate("projectId", "name")
       .populate("assignedTo", "name email")
       .populate("createdBy", "name email");
 
-    // ======================================
     // Activity Log
-    // ======================================
 
     await createActivityLog({
       action: "TASK_CREATED",
@@ -61,9 +54,7 @@ export const createTask = async (req, res) => {
       tenantId: req.user.tenantId,
     });
 
-    // ======================================
     // Response
-    // ======================================
 
     return res.status(201).json({
       success: true,
@@ -98,9 +89,7 @@ export const getAllTasks = async (req, res) => {
       isDeleted: false,
     };
 
-    // ======================================
     // Project Manager
-    // ======================================
 
     if (req.isProjectManager) {
 
@@ -110,9 +99,7 @@ export const getAllTasks = async (req, res) => {
 
     }
 
-    // ======================================
     // Project Member
-    // ======================================
 
     else {
 
@@ -125,6 +112,24 @@ export const getAllTasks = async (req, res) => {
       .populate("assignedTo", "name email")
       .populate("createdBy", "name email")
       .sort({ createdAt: -1 });
+
+    //   if (!tasks) {
+    //     return res.status(404).json({
+    //       message: "Task not found"
+    //     });
+    //   }
+
+    // const membership = await ProjectMember.findOne({
+    //   userId: req.user.userId,
+    //   projectId: tasks.projectId,
+    //   tenantId: req.user.tenantId
+    // });
+
+    // if (!membership) {
+    //   return res.status(403).json({
+    //     message: "You are not a member of this project"
+    //   });
+    // }
 
     return res.status(200).json({
       success: true,
@@ -156,17 +161,13 @@ export const deleteTask = async (req, res) => {
     // Task is already available from middleware
     const task = req.task;
 
-    // ======================================
     // Soft Delete
-    // ======================================
 
     task.isDeleted = true;
 
     await task.save();
 
-    // ======================================
     // Activity Log
-    // ======================================
 
     await createActivityLog({
       action: "TASK_DELETED",
@@ -176,9 +177,7 @@ export const deleteTask = async (req, res) => {
       tenantId: req.user.tenantId,
     });
 
-    // ======================================
     // Response
-    // ======================================
 
     return res.status(200).json({
       success: true,
@@ -207,15 +206,11 @@ export const updateTaskStatus = async (req, res) => {
 
     const { status } = req.body;
 
-    // =====================================
     // Task comes from validateTask middleware
-    // =====================================
 
     const task = req.task;
 
-    // =====================================
     // Update Status
-    // =====================================
 
     task.status = status;
 
@@ -227,9 +222,7 @@ export const updateTaskStatus = async (req, res) => {
 
     await task.save();
 
-    // =====================================
     // Populate Updated Task
-    // =====================================
 
     const updatedTask = await task.populate([
       {
@@ -246,9 +239,7 @@ export const updateTaskStatus = async (req, res) => {
       },
     ]);
 
-    // =====================================
     // Activity Log
-    // =====================================
 
     await createActivityLog({
       action: "TASK_STATUS_UPDATED",
@@ -258,9 +249,7 @@ export const updateTaskStatus = async (req, res) => {
       tenantId: req.user.tenantId,
     });
 
-    // =====================================
     // Response
-    // =====================================
 
     return res.status(200).json({
       success: true,
