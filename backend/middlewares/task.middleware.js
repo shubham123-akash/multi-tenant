@@ -1,4 +1,6 @@
 import Task from "../models/task.model.js";
+import ProjectMember from "../models/projectMember.model.js";
+
 
 // =======================================================
 // Validate Task
@@ -69,10 +71,27 @@ export const validateTaskStatus = (req, res, next) => {
 // Validate Status Transition
 // =======================================================
 
-export const validateTaskStatusFlow = (req, res, next) => {
+export const validateTaskStatusFlow = async(req, res, next) => {
 
-  const task = req.task;
-  const newStatus = req.body.status;
+  try {
+
+    const task = req.task;
+    const newStatus = req.body.status;
+
+    const member = await ProjectMember.findOne({
+      tenantId: req.user.tenantId,
+      projectId: req.project._id,
+      userId: req.user.userId,
+      role: "MEMBER",
+      status: "ACTIVE",
+    });
+  
+    if (!member) {
+      return res.status(403).json({
+        success: false,
+        message: "Only Project member can perform this action.",
+      });
+    }
 
   const statusFlow = {
     TODO: ["IN_PROGRESS"],
@@ -90,5 +109,14 @@ export const validateTaskStatusFlow = (req, res, next) => {
   }
 
   next();
+    
+  } catch (error) {
+    console.error("Validate task status flow error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
 
 };

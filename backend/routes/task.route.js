@@ -100,7 +100,7 @@ router.patch(
   validateTaskStatus,
   validateProject,
   validateActiveProject,
-  isProjectManager,
+  
   validateTaskStatusFlow,
   updateTaskStatus
 );

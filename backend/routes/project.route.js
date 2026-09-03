@@ -10,6 +10,7 @@ router.route("/createProject").post(isAuthenticated,allowRoles(["OWNER", "ADMIN"
 router.route("/getAllProjects").get(isAuthenticated, allowRoles(["OWNER", "ADMIN", "MEMBER"]), getAllProjects);
 router.route("/getSingleProject/:id").get(isAuthenticated, getSingleProject);
 router.route("/deleteProject/:projectId").delete(isAuthenticated, allowRoles(["OWNER", "ADMIN"]), deleteProject);
-router.route("/updateStatus/:projectId").patch(isAuthenticated, allowRoles(["OWNER", "ADMIN"]), updateProjectStatus);
+router.route("/updateStatus/:projectId").patch(isAuthenticated, allowRoles(["MEMBER"]), updateProjectStatus);
+// router.route("/updateStatus/:projectId").patch(isAuthenticated, allowRoles(["OWNER", "ADMIN"]), updateProjectStatus);
 
 export default router;
