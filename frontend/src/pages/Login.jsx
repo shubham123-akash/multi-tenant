@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import axios from "axios";
+import axiosInstance from "../utils/axiosInstance";
 import { USER_API_END_POINT } from '../utils/Constant';
 import toast from "react-hot-toast";
 
@@ -18,10 +18,10 @@ const Login = () => {
     e.preventDefault();
     setLoading(true);
 
-    const user = {email, password, tenantId};
+    const user = {email, password};
 
     try {
-      const res = await axios.post(`${USER_API_END_POINT}/login`, user, {
+      const res = await axiosInstance.post(`${USER_API_END_POINT}/login`, user, {
         headers: { 'Content-Type': 'application/json' },
         withCredentials: true
       });
@@ -99,7 +99,7 @@ const Login = () => {
             </div>
 
             {/* Tenant ID */}
-            <div>
+            {/* <div>
               <label className="text-gray-600 text-sm">Tenant ID</label>
               <input
                 value={tenantId}
@@ -109,7 +109,7 @@ const Login = () => {
                 className="w-full mt-1 px-4 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 required
               />
-            </div>
+            </div> */}
 
             {/* Login Button */}
             <button

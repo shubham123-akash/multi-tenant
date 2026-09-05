@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import axiosInstance from "../utils/axiosInstance";
 import {
   PROJECT_API_END_POINT,
   TENANT_API_END_POINT,
@@ -22,10 +22,10 @@ const Dashboard = () => {
 
   const fetchData = async () => {
     const [tenantRes, projectRes, userRes, meRes] = await Promise.all([
-      axios.get(`${TENANT_API_END_POINT}/getTenantInfo`, { withCredentials: true }),
-      axios.get(`${PROJECT_API_END_POINT}/getAllProjects`, { withCredentials: true }),
-      axios.get(`${USER_API_END_POINT}/getUsers`, { withCredentials: true }),
-      axios.get(`${USER_API_END_POINT}/me`, { withCredentials: true })
+      axiosInstance.get(`${TENANT_API_END_POINT}/getTenantInfo`, { withCredentials: true }),
+      axiosInstance.get(`${PROJECT_API_END_POINT}/getAllProjects`, { withCredentials: true }),
+      axiosInstance.get(`${USER_API_END_POINT}/getUsers`, { withCredentials: true }),
+      axiosInstance.get(`${USER_API_END_POINT}/me`, { withCredentials: true })
     ]);
 
     console.log("Tenant Response:", tenantRes.data);

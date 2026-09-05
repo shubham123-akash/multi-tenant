@@ -9,6 +9,7 @@ import cors from "cors";
 import activityRouter from "./routes/activity.route.js";
 import projectMemberRoute from "./routes/projectMember.route.js";
 import taskRoute from "./routes/task.route.js";
+import { globalLimiter } from "./middlewares/rateLimit.middleware.js";
 
 const app = express();
 
@@ -28,6 +29,9 @@ const corsOptions = {
 }
 
 app.use(cors(corsOptions));
+
+// applies to every /api route; individual routers add stricter limits on top where needed
+app.use("/api", globalLimiter);
 
 app.use("/api/v1/users", userRouter);
 app.use("/api/v1/projects", projectRouter);

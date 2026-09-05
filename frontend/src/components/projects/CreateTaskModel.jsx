@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 
-import axios from "axios";
+import axiosInstance from "../../utils/axiosInstance";
 
 import toast from "react-hot-toast";
 
@@ -26,7 +26,7 @@ const CreateTaskModal = ({ projectId, members, onClose, onTaskCreated }) => {
 
     try {
       setLoading(true);
-      const response = await axios.post(
+      const response = await axiosInstance.post(
         `${TASK_API_END_POINT}/create`,
         {
           title,

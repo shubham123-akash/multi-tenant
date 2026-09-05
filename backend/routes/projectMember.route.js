@@ -58,7 +58,6 @@ router.get(
   isAuthenticated,
   allowRoles(["OWNER", "ADMIN", "MEMBER"]),
   validateProject,
-  validateActiveProject,
   getProjectMembers
 );
 

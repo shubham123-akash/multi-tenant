@@ -32,9 +32,15 @@ const userSchema = new mongoose.Schema({
     isActive: {
       type: Boolean,
       default: true
+    },
+
+    // hashed refresh token, stored so it can be verified & revoked (rotation, logout, theft detection)
+    refreshToken: {
+      type: String,
+      default: null,
+      select: false
     }
 }, { timestamps: true });
 
 const User = mongoose.model("User", userSchema);
 export default User;
-

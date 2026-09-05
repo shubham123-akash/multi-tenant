@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import axios from "axios"
+import axiosInstance from "../utils/axiosInstance";
 import { USER_API_END_POINT } from '../utils/Constant';
 import toast from "react-hot-toast";
 
@@ -22,7 +22,7 @@ const Register = () => {
     const user = {name, email, password, companyName};
 
     try {
-      const res = await axios.post(`${USER_API_END_POINT}/register`, user, {
+      const res = await axiosInstance.post(`${USER_API_END_POINT}/register`, user, {
         headers: { 'Content-Type': 'application/json' },
         withCredentials: true
       });

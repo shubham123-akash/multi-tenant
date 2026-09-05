@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import axiosInstance from "../utils/axiosInstance";
 import toast from "react-hot-toast";
 import { ACTIVITY_API_END_POINT, USER_API_END_POINT } from "../utils/Constant";
 
@@ -12,7 +12,7 @@ const Activity = () => {
   // 🔥 Fetch logged-in user role
   const fetchUser = async () => {
     try {
-      const res = await axios.get(
+      const res = await axiosInstance.get(
         `${USER_API_END_POINT}/me`,
         { withCredentials: true }
       );
@@ -27,7 +27,7 @@ const Activity = () => {
     try {
       setLoading(true);
 
-      const res = await axios.get(
+      const res = await axiosInstance.get(
         `${ACTIVITY_API_END_POINT}/getLogs`,
         { withCredentials: true }
       );

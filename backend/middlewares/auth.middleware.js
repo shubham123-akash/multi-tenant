@@ -21,6 +21,14 @@ export const isAuthenticated = async(req, res, next) => {
     
         next();
     } catch (error) {
+        if (error.name === "TokenExpiredError") {
+            return res.status(401).json({
+                message: "Access token expired",
+                code: "TOKEN_EXPIRED",
+                success: false
+            });
+        }
+
         return res.status(401).json({
             message: "Invalid or expired token",
             success: false

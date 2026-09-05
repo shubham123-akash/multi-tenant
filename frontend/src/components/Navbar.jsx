@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import axiosInstance from "../utils/axiosInstance";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { USER_API_END_POINT, TENANT_API_END_POINT } from "../utils/Constant";
@@ -12,7 +12,7 @@ const Navbar = () => {
   // 🔥 Fetch Tenant Info
   const fetchTenant = async () => {
     try {
-      const res = await axios.get(
+      const res = await axiosInstance.get(
         `${TENANT_API_END_POINT}/getTenantInfo`,
         { withCredentials: true }
       );
@@ -33,7 +33,7 @@ const Navbar = () => {
   const handleLogout = async () => {
     try {
 
-      const res = await axios.get(`${USER_API_END_POINT}/logout`, {
+      const res = await axiosInstance.get(`${USER_API_END_POINT}/logout`, {
         withCredentials: true
       });
 

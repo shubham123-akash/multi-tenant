@@ -13,7 +13,7 @@ export const ProjectRow = ({
       <td className="px-6 py-4 text-gray-600">{project.description}</td>
 
       <td className="px-6 py-4">
-        {role === "OWNER" || role === "ADMIN" ? (
+        {role === "OWNER" || role === "ADMIN" || role === "MEMBER" ? (
           <select
             value={project.status}
             onChange={(e) => handleStatusChange(project._id, e.target.value)}

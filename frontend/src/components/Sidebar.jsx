@@ -1,6 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
-import axios from "axios";
+import axiosInstance from "../utils/axiosInstance";
 import { USER_API_END_POINT } from "../utils/Constant";
 
 const Sidebar = () => {
@@ -11,7 +11,7 @@ const Sidebar = () => {
   // 🔥 Fetch user role
   const fetchUser = async () => {
     try {
-      const res = await axios.get(
+      const res = await axiosInstance.get(
         `${USER_API_END_POINT}/me`,
         { withCredentials: true }
       );

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import axiosInstance from "../utils/axiosInstance";
 import toast from "react-hot-toast";
 import { USER_API_END_POINT } from "../utils/Constant";
 
@@ -22,7 +22,7 @@ const Users = () => {
   // 🔥 Fetch all users
   const fetchUsers = async () => {
     try {
-      const res = await axios.get(
+      const res = await axiosInstance.get(
         `${USER_API_END_POINT}/getUsers`,
         {
           withCredentials: true,
@@ -55,7 +55,7 @@ const Users = () => {
     e.preventDefault();
 
     try {
-      const res = await axios.post(
+      const res = await axiosInstance.post(
         `${USER_API_END_POINT}/createUsers`,
         formData,
         { withCredentials: true }

@@ -215,7 +215,6 @@ export const deleteProject = async(req, res) => {
 // Update Project Status
 export const updateProjectStatus = async (req, res) => {
   try {
-
     const { projectId } = req.params;
     const { status } = req.body;
 
@@ -225,22 +224,27 @@ export const updateProjectStatus = async (req, res) => {
     if (!allowedStatuses.includes(status)) {
       return res.status(400).json({
         message: "Invalid status value",
-        success: false
+        success: false,
       });
     }
 
+    // Find project belonging to the user's tenant
     const project = await Project.findOne({
       _id: projectId,
-      tenantId: req.user.tenantId
+      tenantId: req.user.tenantId,
     });
 
     if (!project) {
       return res.status(404).json({
         message: "Project not found",
-        success: false
+        success: false,
       });
     }
 
+    // Current status of the project
+    const currentStatus = project.status;
+
+    // Allowed status transitions
     const allowedTransitions = {
       ACTIVE: ["ARCHIVED"],
       ARCHIVED: ["COMPLETED"],
@@ -256,28 +260,31 @@ export const updateProjectStatus = async (req, res) => {
       });
     }
 
+    // Update status
     project.status = status;
     await project.save();
 
+    // Activity log
     await createActivityLog({
       action: `PROJECT_STATUS_UPDATED_TO_${status}`,
       entityType: "PROJECT",
       entityId: project._id,
       performedBy: req.user.userId,
-      tenantId: req.user.tenantId
+      tenantId: req.user.tenantId,
     });
-
 
     return res.status(200).json({
       message: "Project status updated successfully",
       success: true,
-      project
+      project,
     });
 
   } catch (error) {
+    console.error("updateProjectStatus Error:", error);
+
     return res.status(500).json({
       message: "Failed to update status",
-      success: false
+      success: false,
     });
   }
-}; 
+};

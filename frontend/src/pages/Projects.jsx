@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import axiosInstance from "../utils/axiosInstance";
 import toast from "react-hot-toast";
 import { PROJECT_API_END_POINT, USER_API_END_POINT } from "../utils/Constant";
 
@@ -21,7 +21,7 @@ const Projects = () => {
 
   const fetchUser = async () => {
     try {
-      const res = await axios.get(
+      const res = await axiosInstance.get(
         `${USER_API_END_POINT}/me`,
         { withCredentials: true }
       );
@@ -34,7 +34,7 @@ const Projects = () => {
   const fetchProjects = async () => {
     try {
       setLoading(true);
-      const res = await axios.get(
+      const res = await axiosInstance.get(
         `${PROJECT_API_END_POINT}/getAllProjects`,
         { withCredentials: true }
       );
@@ -61,7 +61,7 @@ const Projects = () => {
   const handleCreateProject = async (e) => {
     e.preventDefault();
     try {
-      const res = await axios.post(
+      const res = await axiosInstance.post(
         `${PROJECT_API_END_POINT}/createProject`,
         formData,
         { withCredentials: true }
@@ -79,7 +79,7 @@ const Projects = () => {
 
   const handleDeleteProject = async (projectId) => {
     try {
-      const res = await axios.delete(
+      const res = await axiosInstance.delete(
         `${PROJECT_API_END_POINT}/deleteProject/${projectId}`,
         { withCredentials: true }
       );
@@ -94,7 +94,7 @@ const Projects = () => {
 
   const handleStatusChange = async (projectId, newStatus) => {
     try {
-      const res = await axios.patch(
+      const res = await axiosInstance.patch(
         `${PROJECT_API_END_POINT}/updateStatus/${projectId}`,
         { status: newStatus },
         { withCredentials: true }
