@@ -2,6 +2,8 @@ import Project from "../models/project.model.js";
 import { createActivityLog } from "../utils/createActivityLog.js";
 import ProjectMember from "../models/projectMember.model.js";
 import Task from "../models/task.model.js";
+import { getPagination, buildPaginationMeta } from "../utils/paginate.js";
+import { emitToTenant } from "../utils/socket.js";
 
 
 // create Project
@@ -31,6 +33,8 @@ export const createProject = async(req, res) => {
       performedBy: req.user.userId,
       tenantId: req.user.tenantId
     });
+
+    emitToTenant(req.user.tenantId, "project:created", project);
   
     return res.status(201).json({
       message: "Project created successfully",
@@ -58,17 +62,12 @@ export const getAllProjects = async (req, res) => {
       });
     }
 
-    let projects;
+    const { page, limit, skip } = getPagination(req);
 
-    // OWNER & ADMIN -> All Projects
-    if (req.user.role === "OWNER" || req.user.role === "ADMIN") {
-      projects = await Project.find({
-        tenantId: req.user.tenantId,
-      });
-    }
+    let filter = { tenantId: req.user.tenantId };
 
     // MEMBER -> Only Assigned Projects
-    else if (req.user.role === "MEMBER") {
+    if (req.user.role === "MEMBER") {
 
       const memberships = await ProjectMember.find({
         tenantId: req.user.tenantId,
@@ -78,16 +77,24 @@ export const getAllProjects = async (req, res) => {
 
       const projectIds = memberships.map(member => member.projectId);
 
-      projects = await Project.find({
-        _id: { $in: projectIds },
-        tenantId: req.user.tenantId,
-      });
+      filter._id = { $in: projectIds };
     }
+
+    // OWNER & ADMIN -> All Projects (filter already scoped to tenant)
+
+    const [projects, totalItems] = await Promise.all([
+      Project.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      Project.countDocuments(filter)
+    ]);
 
     return res.status(200).json({
       success: true,
-      totalProjects: projects.length,
+      totalProjects: totalItems,
       projects,
+      pagination: buildPaginationMeta(totalItems, page, limit)
     });
 
   } catch (error) {
@@ -194,6 +201,8 @@ export const deleteProject = async(req, res) => {
       performedBy: req.user.userId,
       tenantId: req.user.tenantId
     });
+
+    emitToTenant(req.user.tenantId, "project:deleted", { projectId: project._id });
   
     return res.status(200).json({
       message: "Project deleted successfully"
@@ -272,6 +281,8 @@ export const updateProjectStatus = async (req, res) => {
       performedBy: req.user.userId,
       tenantId: req.user.tenantId,
     });
+
+    emitToTenant(req.user.tenantId, "project:updated", project);
 
     return res.status(200).json({
       message: "Project status updated successfully",

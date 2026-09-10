@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { createBrowserRouter, RouterProvider, Outlet } from 'react-router-dom';
 
 import Register from '../pages/Register';
@@ -6,13 +6,23 @@ import Login from '../pages/Login';
 import Dashboard from "../pages/Dashboard";
 import Projects from "../pages/Projects";
 import Users from "../pages/Users";
-import Activity from "../pages/Activity";   // 🔥 NEW IMPORT
+import Activity from "../pages/Activity";
 import Sidebar from "./Sidebar";
 import Navbar from "./Navbar";
+import { connectSocket, disconnectSocket } from "../utils/socket";
 
 
 // 🔹 Layout for protected pages
 const MainLayout = () => {
+
+  // socket only makes sense once the user is authenticated (this layout
+  // is only reached for logged-in routes) - connect once here so every
+  // child page can just add its own event listeners.
+  useEffect(() => {
+    connectSocket();
+    return () => disconnectSocket();
+  }, []);
+
   return (
     <div className="flex h-screen">
       

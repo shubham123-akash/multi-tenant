@@ -2,6 +2,8 @@ import Project from "../models/project.model.js";
 import ProjectMember from "../models/projectMember.model.js";
 import User from "../models/user.model.js";
 import { createActivityLog } from "../utils/createActivityLog.js";
+import { getPagination, buildPaginationMeta } from "../utils/paginate.js";
+import { emitToProject } from "../utils/socket.js";
 
 
 
@@ -25,6 +27,13 @@ export const assignUser = async (req, res) => {
       performedBy: req.user.userId,
       tenantId: req.user.tenantId,
     });
+
+    const populatedMember = await projectMember.populate([
+      { path: "userId", select: "name email role" },
+      { path: "assignedBy", select: "name email" }
+    ]);
+
+    emitToProject(req.project._id, "project:memberAssigned", populatedMember);
 
     return res.status(201).json({
       success: true,
@@ -73,6 +82,8 @@ export const removeUser = async (req, res) => {
       tenantId: req.user.tenantId,
     });
 
+    emitToProject(req.project._id, "project:memberRemoved", { userId });
+
     return res.status(200).json({
       success: true,
       message: "User removed successfully",
@@ -93,17 +104,28 @@ export const removeUser = async (req, res) => {
 export const getProjectMembers = async (req, res) => {
   try {
 
-    const members = await ProjectMember.find({
+    const { page, limit, skip } = getPagination(req);
+
+    const filter = {
       projectId: req.project._id,
       tenantId: req.user.tenantId,
-    })
-      .populate("userId", "name email role")
-      .populate("assignedBy", "name email");
+    };
+
+    const [members, totalItems] = await Promise.all([
+      ProjectMember.find(filter)
+        .populate("userId", "name email role")
+        .populate("assignedBy", "name email")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      ProjectMember.countDocuments(filter)
+    ]);
 
     return res.status(200).json({
       success: true,
-      totalMembers: members.length,
+      totalMembers: totalItems,
       members,
+      pagination: buildPaginationMeta(totalItems, page, limit)
     });
 
   } catch (error) {

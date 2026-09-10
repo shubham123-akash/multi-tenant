@@ -6,10 +6,14 @@ import { PROJECT_API_END_POINT, USER_API_END_POINT } from "../utils/Constant";
 import ProjectsHeader from "../components/projects/ProjectsHeader";
 import ProjectsTable from "../components/projects/ProjectsTable";
 import CreateProjectModal from "../components/projects/CreateProjectModal";
+import Pagination from "../components/common/Pagination";
+import { socket } from "../utils/socket";
 
 const Projects = () => {
 
   const [projects, setProjects] = useState([]);
+  const [pagination, setPagination] = useState(null);
+  const [page, setPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [role, setRole] = useState("");
@@ -31,14 +35,18 @@ const Projects = () => {
     }
   };
 
-  const fetchProjects = async () => {
+  const fetchProjects = async (targetPage = 1) => {
     try {
       setLoading(true);
       const res = await axiosInstance.get(
         `${PROJECT_API_END_POINT}/getAllProjects`,
-        { withCredentials: true }
+        {
+          params: { page: targetPage, limit: 10 },
+          withCredentials: true
+        }
       );
       setProjects(res.data.projects);
+      // setPagination(res.data.pagination);
     } catch (error) {
       toast.error("Failed to fetch projects");
     } finally {
@@ -47,9 +55,43 @@ const Projects = () => {
   };
 
   useEffect(() => {
-    fetchProjects();
+    fetchProjects(page);
+  }, [page]);
+
+  useEffect(() => {
     fetchUser();
   }, []);
+
+  // 🔴 Live updates - reflect changes made by other users in this tenant
+  // in real time without requiring a manual refresh.
+  useEffect(() => {
+    const handleCreated = (project) => {
+      // only splice into the currently viewed page if we're on page 1,
+      // otherwise just let the counts update on next navigation
+      if (page === 1) {
+        setProjects(prev => [project, ...prev].slice(0, 10));
+      }
+      // setPagination(prev => prev ? { ...prev, totalItems: prev.totalItems + 1 } : prev);
+    };
+
+    const handleUpdated = (project) => {
+      setProjects(prev => prev.map(p => (p._id === project._id ? project : p)));
+    };
+
+    const handleDeleted = ({ projectId }) => {
+      setProjects(prev => prev.filter(p => p._id !== projectId));
+    };
+
+    socket.on("project:created", handleCreated);
+    socket.on("project:updated", handleUpdated);
+    socket.on("project:deleted", handleDeleted);
+
+    return () => {
+      socket.off("project:created", handleCreated);
+      socket.off("project:updated", handleUpdated);
+      socket.off("project:deleted", handleDeleted);
+    };
+  }, [page]);
 
   const handleChange = (e) => {
     setFormData({
@@ -68,7 +110,8 @@ const Projects = () => {
       );
 
       toast.success(res.data.message);
-      setProjects([...projects, res.data.project]);
+      // the socket "project:created" listener above will also add it, so
+      // just close the modal here; no local state mutation to avoid dupes
       setShowModal(false);
       setFormData({ name: "", description: "" });
 
@@ -85,7 +128,7 @@ const Projects = () => {
       );
 
       toast.success(res.data.message);
-      setProjects(projects.filter(p => p._id !== projectId));
+      // socket "project:deleted" listener will also remove it from state
 
     } catch (error) {
       toast.error("Failed to delete project");
@@ -101,12 +144,7 @@ const Projects = () => {
       );
 
       toast.success(res.data.message);
-
-      setProjects(prev =>
-        prev.map(p =>
-          p._id === projectId ? res.data.project : p
-        )
-      );
+      // socket "project:updated" listener will also sync this row
 
     } catch (error) {
       toast.error("Failed to update status");
@@ -139,6 +177,8 @@ const Projects = () => {
         handleStatusChange={handleStatusChange}
         getStatusStyle={getStatusStyle}
       />
+
+      <Pagination pagination={pagination} onPageChange={setPage} />
 
       <CreateProjectModal
         showModal={showModal}

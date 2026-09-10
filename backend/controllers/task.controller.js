@@ -1,6 +1,8 @@
 import Task from "../models/task.model.js";
 import { createActivityLog } from "../utils/createActivityLog.js";
 import ProjectMember from "../models/projectMember.model.js";
+import { getPagination, buildPaginationMeta } from "../utils/paginate.js";
+import { emitToProject } from "../utils/socket.js";
 
 export const createTask = async (req, res) => {
   try {
@@ -53,6 +55,8 @@ export const createTask = async (req, res) => {
       performedBy: req.user.userId,
       tenantId: req.user.tenantId,
     });
+
+    emitToProject(populatedTask.projectId?._id || task.projectId, "task:created", populatedTask);
 
     // Response
 
@@ -107,34 +111,35 @@ export const getAllTasks = async (req, res) => {
 
     }
 
-    const tasks = await Task.find(query)
-      .populate("projectId", "name status")
-      .populate("assignedTo", "name email")
-      .populate("createdBy", "name email")
-      .sort({ createdAt: -1 });
+    // Optional: scope to a single project (used by the project tasks tab)
+    if (req.query.projectId) {
+      const isAllowed =
+        !req.isProjectManager ||
+        req.managedProjectIds?.some(id => id.toString() === req.query.projectId);
 
-    //   if (!tasks) {
-    //     return res.status(404).json({
-    //       message: "Task not found"
-    //     });
-    //   }
+      if (isAllowed) {
+        query.projectId = req.query.projectId;
+      }
+    }
 
-    // const membership = await ProjectMember.findOne({
-    //   userId: req.user.userId,
-    //   projectId: tasks.projectId,
-    //   tenantId: req.user.tenantId
-    // });
+    const { page, limit, skip } = getPagination(req);
 
-    // if (!membership) {
-    //   return res.status(403).json({
-    //     message: "You are not a member of this project"
-    //   });
-    // }
+    const [tasks, totalItems] = await Promise.all([
+      Task.find(query)
+        .populate("projectId", "name status")
+        .populate("assignedTo", "name email")
+        .populate("createdBy", "name email")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      Task.countDocuments(query)
+    ]);
 
     return res.status(200).json({
       success: true,
-      totalTasks: tasks.length,
+      totalTasks: totalItems,
       tasks,
+      pagination: buildPaginationMeta(totalItems, page, limit)
     });
 
   } catch (error) {
@@ -176,6 +181,8 @@ export const deleteTask = async (req, res) => {
       performedBy: req.user.userId,
       tenantId: req.user.tenantId,
     });
+
+    emitToProject(task.projectId, "task:deleted", { taskId: task._id });
 
     // Response
 
@@ -248,6 +255,8 @@ export const updateTaskStatus = async (req, res) => {
       performedBy: req.user.userId,
       tenantId: req.user.tenantId,
     });
+
+    emitToProject(updatedTask.projectId?._id || updatedTask.projectId, "task:updated", updatedTask);
 
     // Response
 

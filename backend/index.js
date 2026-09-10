@@ -1,5 +1,6 @@
 import express from "express";
 import dotenv from "dotenv";
+import http from "http";
 import connectDB from "./constant/db.js";
 import cookieParser from "cookie-parser";
 import userRouter from "./routes/user.route.js";
@@ -10,8 +11,10 @@ import activityRouter from "./routes/activity.route.js";
 import projectMemberRoute from "./routes/projectMember.route.js";
 import taskRoute from "./routes/task.route.js";
 import { globalLimiter } from "./middlewares/rateLimit.middleware.js";
+import { initSocket } from "./utils/socket.js";
 
 const app = express();
+const httpServer = http.createServer(app);
 
 dotenv.config({
     path: ".env"
@@ -24,7 +27,7 @@ app.use(express.json());
 app.use(cookieParser());
 
 const corsOptions = {
-    origin: "http://localhost:3000",
+    origin: process.env.CLIENT_URL || "http://localhost:3000",
     credentials: true
 }
 
@@ -40,7 +43,8 @@ app.use("/api/v1/activity", activityRouter);
 app.use("/api/v1/project-member", projectMemberRoute);
 app.use("/api/v1/tasks", taskRoute);
 
+initSocket(httpServer);
 
-app.listen(process.env.PORT, () => {
+httpServer.listen(process.env.PORT, () => {
     console.log(`server started on PORT : ${process.env.PORT}`);
 })

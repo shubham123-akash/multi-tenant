@@ -3,14 +3,18 @@ import axiosInstance from "../../utils/axiosInstance";
 import toast from "react-hot-toast";
 import { PROJECT_MEMBER_API_END_POINT, TASK_API_END_POINT } from "../../utils/Constant";
 import CreateTaskModal from "./CreateTaskModel";
+import Pagination from "../common/Pagination";
+import { socket, joinProjectRoom, leaveProjectRoom } from "../../utils/socket";
 
 // Internal Modal Component for Assigning Tasks
 
 const ProjectMembersPage = ({ projectId, onClose }) => {
   const [activeTab, setActiveTab] = useState("members"); // "members" or "tasks"
-  
+
   // Members state
   const [members, setMembers] = useState([]);
+  const [membersPage, setMembersPage] = useState(1);
+  const [membersPagination, setMembersPagination] = useState(null);
   const [loadingMembers, setLoadingMembers] = useState(true);
   const [showAssignForm, setShowAssignForm] = useState(false);
   const [userIdInput, setUserIdInput] = useState("");
@@ -19,28 +23,29 @@ const ProjectMembersPage = ({ projectId, onClose }) => {
 
   // Tasks state
   const [tasks, setTasks] = useState([]);
+  const [tasksPage, setTasksPage] = useState(1);
+  const [tasksPagination, setTasksPagination] = useState(null);
   const [loadingTasks, setLoadingTasks] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
 
   // Check if current logged-in user is a Manager in this project
   const [isManager, setIsManager] = useState(false);
 
-  // Fetch project members
-  const fetchMembers = async () => {
+  // Fetch project members (paginated)
+  const fetchMembers = async (targetPage = 1) => {
     if (!projectId) return;
     try {
       setLoadingMembers(true);
       const response = await axiosInstance.get(
         `${PROJECT_MEMBER_API_END_POINT}/${projectId}/members`,
-        { withCredentials: true }
+        { params: { page: targetPage, limit: 10 }, withCredentials: true }
       );
       if (response.data.success) {
         setMembers(response.data.members);
-        
-        // Determine if current user has MANAGER role in project members list
-        // (Assuming backend returns current user context or you check against active userId)
+        setMembersPagination(response.data.pagination);
+
         const currentUserMember = response.data.members.find(
-          (m) => m.role === "MANAGER" // Adjust based on how backend responds with logged user info
+          (m) => m.role === "MANAGER"
         );
         if (currentUserMember) {
           setIsManager(true);
@@ -54,20 +59,18 @@ const ProjectMembersPage = ({ projectId, onClose }) => {
     }
   };
 
-  // Fetch project tasks
-  const fetchTasks = async () => {
+  // Fetch project tasks (paginated, scoped server-side to this project)
+  const fetchTasks = async (targetPage = 1) => {
     if (!projectId) return;
     try {
       setLoadingTasks(true);
       const response = await axiosInstance.get(
         `${TASK_API_END_POINT}`,
-        { withCredentials: true }
+        { params: { projectId, page: targetPage, limit: 10 }, withCredentials: true }
       );
       if (response.data.success) {
-        const projectTasks = response.data.tasks.filter(
-          (t) => t.projectId?._id === projectId || t.projectId === projectId
-        );
-        setTasks(projectTasks);
+        setTasks(response.data.tasks);
+        setTasksPagination(response.data.pagination);
       }
     } catch (err) {
       console.error(err);
@@ -78,9 +81,64 @@ const ProjectMembersPage = ({ projectId, onClose }) => {
   };
 
   useEffect(() => {
-    fetchMembers();
-    fetchTasks();
+    setMembersPage(1);
+    setTasksPage(1);
+    fetchMembers(1);
+    fetchTasks(1);
+
+    // join this project's room for live task/member updates while the modal is open
+    joinProjectRoom(projectId);
+    return () => leaveProjectRoom(projectId);
   }, [projectId]);
+
+  useEffect(() => {
+    fetchMembers(membersPage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [membersPage]);
+
+  useEffect(() => {
+    fetchTasks(tasksPage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasksPage]);
+
+  // 🔴 Live updates for this project's room
+  useEffect(() => {
+    const handleTaskCreated = (task) => {
+      if (tasksPage === 1) setTasks(prev => [task, ...prev].slice(0, 10));
+      setTasksPagination(prev => prev ? { ...prev, totalItems: prev.totalItems + 1 } : prev);
+    };
+
+    const handleTaskUpdated = (task) => {
+      setTasks(prev => prev.map(t => (t._id === task._id ? task : t)));
+    };
+
+    const handleTaskDeleted = ({ taskId }) => {
+      setTasks(prev => prev.filter(t => t._id !== taskId));
+    };
+
+    const handleMemberAssigned = (member) => {
+      if (membersPage === 1) setMembers(prev => [member, ...prev].slice(0, 10));
+      setMembersPagination(prev => prev ? { ...prev, totalItems: prev.totalItems + 1 } : prev);
+    };
+
+    const handleMemberRemoved = ({ userId }) => {
+      setMembers(prev => prev.filter(m => m.userId?._id !== userId));
+    };
+
+    socket.on("task:created", handleTaskCreated);
+    socket.on("task:updated", handleTaskUpdated);
+    socket.on("task:deleted", handleTaskDeleted);
+    socket.on("project:memberAssigned", handleMemberAssigned);
+    socket.on("project:memberRemoved", handleMemberRemoved);
+
+    return () => {
+      socket.off("task:created", handleTaskCreated);
+      socket.off("task:updated", handleTaskUpdated);
+      socket.off("task:deleted", handleTaskDeleted);
+      socket.off("project:memberAssigned", handleMemberAssigned);
+      socket.off("project:memberRemoved", handleMemberRemoved);
+    };
+  }, [tasksPage, membersPage]);
 
   // Handle Assign User
   const handleAssignUser = async (e) => {
@@ -104,7 +162,7 @@ const ProjectMembersPage = ({ projectId, onClose }) => {
         setUserIdInput("");
         setRoleInput("MEMBER");
         setShowAssignForm(false);
-        fetchMembers();
+        fetchMembers(membersPage);
       }
     } catch (err) {
       console.error(err);
@@ -131,7 +189,7 @@ const ProjectMembersPage = ({ projectId, onClose }) => {
 
       if (response.data.success) {
         toast.success(response.data.message || "User removed successfully!");
-        fetchMembers();
+        fetchMembers(membersPage);
       }
     } catch (err) {
       console.error(err);
@@ -153,7 +211,7 @@ const ProjectMembersPage = ({ projectId, onClose }) => {
 
       if (response.data.success) {
         toast.success(response.data.message || "Task deleted successfully!");
-        fetchTasks(); // Refresh tasks list
+        fetchTasks(tasksPage);
       }
     } catch (err) {
       console.error(err);
@@ -172,7 +230,7 @@ const ProjectMembersPage = ({ projectId, onClose }) => {
 
       if (response.data.success) {
         toast.success("Task status updated!");
-        fetchTasks();
+        fetchTasks(tasksPage);
       }
     } catch (err) {
       console.error(err);
@@ -185,7 +243,7 @@ const ProjectMembersPage = ({ projectId, onClose }) => {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-opacity duration-300">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
-        
+
         {/* Modal Header */}
         <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
           <div>
@@ -199,45 +257,44 @@ const ProjectMembersPage = ({ projectId, onClose }) => {
           </button>
         </div>
 
-        {/* Tab Switcher & Actions Bar */}
-        <div className="px-6 pt-4 pb-2 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-4 bg-white">
-          <div className="flex space-x-2">
-            <button
-              onClick={() => setActiveTab("members")}
-              className={`px-4 py-2 text-sm font-medium rounded-lg transition ${
-                activeTab === "members"
-                  ? "bg-blue-600 text-white shadow"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
-            >
-              Team Members ({members.length})
-            </button>
-            <button
-              onClick={() => setActiveTab("tasks")}
-              className={`px-4 py-2 text-sm font-medium rounded-lg transition ${
-                activeTab === "tasks"
-                  ? "bg-indigo-600 text-white shadow"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
-            >
-              Project Tasks ({tasks.length})
-            </button>
-          </div>
+        {/* Tabs */}
+        <div className="px-6 pt-4 flex gap-6 border-b border-gray-200">
+          <button
+            onClick={() => setActiveTab("members")}
+            className={`pb-3 text-sm font-medium border-b-2 transition ${
+              activeTab === "members"
+                ? "border-blue-600 text-blue-600"
+                : "border-transparent text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            Members
+          </button>
+          <button
+            onClick={() => setActiveTab("tasks")}
+            className={`pb-3 text-sm font-medium border-b-2 transition ${
+              activeTab === "tasks"
+                ? "border-blue-600 text-blue-600"
+                : "border-transparent text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            Tasks
+          </button>
 
-          <div className="flex gap-2 w-full sm:w-auto justify-end">
-            {activeTab === "members" ? (
+          <div className="ml-auto pb-3 flex gap-2">
+            {activeTab === "members" && (
               <button
                 onClick={() => setShowAssignForm(!showAssignForm)}
-                className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg shadow transition"
+                className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 transition"
               >
-                {showAssignForm ? "Cancel Adding" : "+ Add New Member"}
+                {showAssignForm ? "Cancel" : "+ Assign User"}
               </button>
-            ) : (
+            )}
+            {activeTab === "tasks" && (
               <button
                 onClick={() => setShowTaskModal(true)}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg shadow transition"
+                className="px-4 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 transition"
               >
-                + Assign Task
+                + New Task
               </button>
             )}
           </div>
@@ -245,7 +302,7 @@ const ProjectMembersPage = ({ projectId, onClose }) => {
 
         {/* Modal Body */}
         <div className="p-6 flex-grow overflow-y-auto bg-gray-50">
-          
+
           {/* MEMBERS TAB CONTENT */}
           {activeTab === "members" && (
             <div>
@@ -331,11 +388,13 @@ const ProjectMembersPage = ({ projectId, onClose }) => {
                   </table>
                 )}
               </div>
+              <Pagination pagination={membersPagination} onPageChange={setMembersPage} />
             </div>
           )}
 
           {/* TASKS TAB CONTENT */}
           {activeTab === "tasks" && (
+            <>
             <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
               {loadingTasks ? (
                 <div className="p-10 text-center text-gray-500">Loading project tasks...</div>
@@ -365,15 +424,14 @@ const ProjectMembersPage = ({ projectId, onClose }) => {
                         </td>
                         <td className="px-6 py-4">
                           <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                            task.priority === 'HIGH' || task.priority === 'URGENT' 
-                              ? 'bg-red-100 text-red-700' 
+                            task.priority === 'HIGH' || task.priority === 'URGENT'
+                              ? 'bg-red-100 text-red-700'
                               : 'bg-yellow-100 text-yellow-700'
                           }`}>
                             {task.priority}
                           </span>
                         </td>
                         <td className="px-6 py-4">
-                          {/* Interactive status dropdown supporting backend allowed statuses: TODO, IN_PROGRESS, DONE */}
                           <select
                             value={task.status || "TODO"}
                             onChange={(e) => handleStatusChange(task._id, e.target.value)}
@@ -401,13 +459,15 @@ const ProjectMembersPage = ({ projectId, onClose }) => {
                 </table>
               )}
             </div>
+            <Pagination pagination={tasksPagination} onPageChange={setTasksPage} />
+            </>
           )}
 
         </div>
 
         {/* Modal Footer */}
         <div className="px-6 py-3 border-t border-gray-200 bg-gray-50 flex justify-end">
-          <button 
+          <button
             onClick={onClose}
             className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg text-sm font-medium hover:bg-gray-300 transition"
           >
@@ -423,7 +483,7 @@ const ProjectMembersPage = ({ projectId, onClose }) => {
           projectId={projectId}
           members={members}
           onClose={() => setShowTaskModal(false)}
-          onTaskCreated={fetchTasks}
+          onTaskCreated={() => { setTasksPage(1); fetchTasks(1); }}
         />
       )}
     </div>
