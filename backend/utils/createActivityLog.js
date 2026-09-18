@@ -1,5 +1,5 @@
 import ActivityLog from "../models/activityLog.model.js";
-import { emitToTenant } from "./socket.js";
+import { deleteCacheByPattern } from "./cache.js";
 
 export const createActivityLog = async ({
   action,
@@ -10,7 +10,7 @@ export const createActivityLog = async ({
 }) => {
 
   try {
-    const log = await ActivityLog.create({
+    await ActivityLog.create({
       action,
       entityType,
       entityId,
@@ -18,9 +18,10 @@ export const createActivityLog = async ({
       tenantId
     });
 
-    const populatedLog = await log.populate("performedBy", "name email role");
-
-    emitToTenant(tenantId, "activity:new", populatedLog);
+    // Every new log invalidates ALL cached pages of this tenant's activity
+    // feed (page 1, page 2, different limits, etc.), since pagination means
+    // there's no single fixed key to delete anymore.
+    await deleteCacheByPattern(`activity:tenant:${tenantId}:*`);
   } catch (error) {
     console.log("Activity log failed:", error.message);
   }

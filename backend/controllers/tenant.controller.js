@@ -1,7 +1,8 @@
 import Tenant from "../models/tenant.model.js";
 import User from "../models/user.model.js";
+import { getCache, setCache } from "../utils/cache.js";
 
-
+const tenantInfoKey = (tenantId) => `tenant:info:${tenantId}`;
 
 // get information about the tenant
 export const getTenantInformation = async (req, res) => {
@@ -13,6 +14,14 @@ export const getTenantInformation = async (req, res) => {
       });
     }
 
+    const cacheKey = tenantInfoKey(req.user.tenantId);
+
+    const cached = await getCache(cacheKey);
+    if (cached) {
+      res.set("X-Cache", "HIT");
+      return res.json(cached);
+    }
+
     const tenant = await Tenant.findById(req.user.tenantId);
 
     if (!tenant || !tenant.isActive) {
@@ -21,6 +30,10 @@ export const getTenantInformation = async (req, res) => {
       });
     }
 
+    // Tenant info almost never changes and there's no update-tenant route
+    // yet, so a longer TTL is fine here (no explicit invalidation trigger).
+    await setCache(cacheKey, tenant, 600);
+
     res.json(tenant);
   } catch (error) {
     return res.status(500).json({
@@ -28,7 +41,6 @@ export const getTenantInformation = async (req, res) => {
     });
   }
 };
-
 
 
 

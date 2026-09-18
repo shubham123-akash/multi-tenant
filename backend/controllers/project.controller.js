@@ -4,20 +4,36 @@ import ProjectMember from "../models/projectMember.model.js";
 import Task from "../models/task.model.js";
 import { getPagination, buildPaginationMeta } from "../utils/paginate.js";
 import { emitToTenant } from "../utils/socket.js";
+import { getCache, setCache, deleteCache, deleteCacheByPattern } from "../utils/cache.js";
+
+// Cache key must include page/limit + role/user scoping, since results differ
+// per page and MEMBER vs OWNER/ADMIN see different project sets.
+const allProjectsKey = (tenantId, req, page, limit) =>
+  req.user.role === "MEMBER"
+    ? `projects:tenant:${tenantId}:member:${req.user.userId}:page:${page}:limit:${limit}`
+    : `projects:tenant:${tenantId}:all:page:${page}:limit:${limit}`;
+
+const singleProjectKey = (tenantId, projectId) =>
+  `projects:tenant:${tenantId}:project:${projectId}`;
+
+// Wipes every cached project list/detail for a tenant (used on any write)
+const invalidateProjectCaches = async (tenantId) => {
+  await deleteCacheByPattern(`projects:tenant:${tenantId}:*`);
+};
 
 
 // create Project
-export const createProject = async(req, res) => {
+export const createProject = async (req, res) => {
   try {
-    const {name, description} = req.body;
+    const { name, description } = req.body;
 
-    if(!name || !description){
+    if (!name || !description) {
       return res.status(401).json({
         message: "All fields are required",
         success: false
       })
     }
-  
+
     const project = await Project.create({
       name,
       description,
@@ -35,12 +51,15 @@ export const createProject = async(req, res) => {
     });
 
     emitToTenant(req.user.tenantId, "project:created", project);
-  
+
+    // Invalidate cached lists so page 1 etc. reflect the new project
+    await invalidateProjectCaches(req.user.tenantId);
+
     return res.status(201).json({
       message: "Project created successfully",
       project,
     })
-  } catch(error){
+  } catch (error) {
     console.error(error);
 
     return res.status(500).json({
@@ -52,7 +71,6 @@ export const createProject = async(req, res) => {
 
 
 // Get All Projects
-
 export const getAllProjects = async (req, res) => {
   try {
     if (!req.user || !req.user.tenantId) {
@@ -63,6 +81,14 @@ export const getAllProjects = async (req, res) => {
     }
 
     const { page, limit, skip } = getPagination(req);
+
+    const cacheKey = allProjectsKey(req.user.tenantId, req, page, limit);
+
+    const cached = await getCache(cacheKey);
+    if (cached) {
+      res.set("X-Cache", "HIT");
+      return res.status(200).json(cached);
+    }
 
     let filter = { tenantId: req.user.tenantId };
 
@@ -90,12 +116,17 @@ export const getAllProjects = async (req, res) => {
       Project.countDocuments(filter)
     ]);
 
-    return res.status(200).json({
+    const responsePayload = {
       success: true,
       totalProjects: totalItems,
       projects,
       pagination: buildPaginationMeta(totalItems, page, limit)
-    });
+    };
+
+    // Cache for 5 minutes
+    await setCache(cacheKey, responsePayload, 300);
+
+    return res.status(200).json(responsePayload);
 
   } catch (error) {
     console.error(error);
@@ -112,87 +143,61 @@ export const getAllProjects = async (req, res) => {
 // getSingleProject
 export const getSingleProject = async (req, res) => {
   try {
+    const cacheKey = singleProjectKey(req.user.tenantId, req.params.id);
+
+    const cached = await getCache(cacheKey);
+    if (cached) {
+      res.set("X-Cache", "HIT");
+      return res.json(cached);
+    }
+
     const project = await Project.findOne({
-      _id: req.params.id, 
+      _id: req.params.id,
       tenantId: req.user.tenantId
     });
-    
+
 
     if (!project) {
       return res.status(404).json({ message: "Project not found" });
     }
 
+    await setCache(cacheKey, project, 300);
+
     res.json(project);
-  } catch(error){
+  } catch (error) {
     console.error(error);
 
     return res.status(500).json({
-        message: "Internal Server Error",
-        success: false
+      message: "Internal Server Error",
+      success: false
     });
   }
 };
 
 
 // delete project
-export const deleteProject = async(req, res) => {
+export const deleteProject = async (req, res) => {
   try {
-    const {projectId} = req.params;
+    const { projectId } = req.params;
 
-    if(!req.user || !req.user.tenantId){
+    if (!req.user || !req.user.tenantId) {
       return res.status(401).json({
         message: "User not authenticated",
         success: false
       })
     }
-  
+
     const project = await Project.findOneAndDelete({
       _id: projectId,
       tenantId: req.user.tenantId
     });
-  
-    if(!project){
+
+    if (!project) {
       return res.status(404).json({
         message: "project not found",
         success: false
       })
     }
-
-  //   const project = await Project.findOne({
-  //     _id: projectId,
-  //     tenantId: req.user.tenantId
-  //   });
-
-  // if (!project) {
-  //   return res.status(404).json({
-  //     message: "Project not found",
-  //     success: false
-  //   });
-  // }
-
-  // const activeTaskCount = await Task.countDocuments({
-  //   projectId,
-  //   tenantId: req.user.tenantId,
-  //   isDeleted: false,
-  //   status: { $ne: "DONE" }
-  // });
-
-  // const memberCount = await ProjectMember.countDocuments({
-  //   projectId,
-  //   tenantId: req.user.tenantId
-  // });
-
-  // if (activeTaskCount > 0 || memberCount > 0) {
-  //   return res.status(400).json({
-  //     message: "Project cannot be deleted while it has active tasks or members",
-  //     success: false
-  //   });
-  // }
-
-  // await Project.deleteOne({
-  //   _id: projectId,
-  //   tenantId: req.user.tenantId
-  // });
 
     await createActivityLog({
       action: "PROJECT_DELETED",
@@ -203,11 +208,15 @@ export const deleteProject = async(req, res) => {
     });
 
     emitToTenant(req.user.tenantId, "project:deleted", { projectId: project._id });
-  
+
+    // Invalidate cached lists + this project's detail cache
+    await invalidateProjectCaches(req.user.tenantId);
+    await deleteCache(singleProjectKey(req.user.tenantId, projectId));
+
     return res.status(200).json({
       message: "Project deleted successfully"
     })
-  } catch(error){
+  } catch (error) {
     console.error(error);
 
     return res.status(500).json({
@@ -216,9 +225,6 @@ export const deleteProject = async(req, res) => {
     });
   }
 }
-
-
-
 
 
 // Update Project Status
@@ -283,6 +289,10 @@ export const updateProjectStatus = async (req, res) => {
     });
 
     emitToTenant(req.user.tenantId, "project:updated", project);
+
+    // Invalidate cached lists + this project's detail cache
+    await invalidateProjectCaches(req.user.tenantId);
+    await deleteCache(singleProjectKey(req.user.tenantId, projectId));
 
     return res.status(200).json({
       message: "Project status updated successfully",

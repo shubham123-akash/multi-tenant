@@ -3,6 +3,19 @@ import { createActivityLog } from "../utils/createActivityLog.js";
 import ProjectMember from "../models/projectMember.model.js";
 import { getPagination, buildPaginationMeta } from "../utils/paginate.js";
 import { emitToProject } from "../utils/socket.js";
+import { getCache, setCache, deleteCacheByPattern } from "../utils/cache.js";
+
+// Task list depends on tenant + who's asking (manager vs member) + optional
+// projectId filter + page/limit, so all of that has to be in the cache key.
+const allTasksKey = (req, page, limit) => {
+  const scope = req.isProjectManager ? "manager" : "member";
+  const projectScope = req.query.projectId || "all";
+  return `tasks:tenant:${req.user.tenantId}:${scope}:${req.user.userId}:project:${projectScope}:page:${page}:limit:${limit}`;
+};
+
+const invalidateTaskCaches = async (tenantId) => {
+  await deleteCacheByPattern(`tasks:tenant:${tenantId}:*`);
+};
 
 export const createTask = async (req, res) => {
   try {
@@ -58,6 +71,10 @@ export const createTask = async (req, res) => {
 
     emitToProject(populatedTask.projectId?._id || task.projectId, "task:created", populatedTask);
 
+    // Cache Invalidation
+
+    await invalidateTaskCaches(req.user.tenantId);
+
     // Response
 
     return res.status(201).json({
@@ -79,14 +96,18 @@ export const createTask = async (req, res) => {
 };
 
 
-
-
-
-
-
-
 export const getAllTasks = async (req, res) => {
   try {
+
+    const { page, limit, skip } = getPagination(req);
+
+    const cacheKey = allTasksKey(req, page, limit);
+
+    const cached = await getCache(cacheKey);
+    if (cached) {
+      res.set("X-Cache", "HIT");
+      return res.status(200).json(cached);
+    }
 
     let query = {
       tenantId: req.user.tenantId,
@@ -122,8 +143,6 @@ export const getAllTasks = async (req, res) => {
       }
     }
 
-    const { page, limit, skip } = getPagination(req);
-
     const [tasks, totalItems] = await Promise.all([
       Task.find(query)
         .populate("projectId", "name status")
@@ -135,12 +154,17 @@ export const getAllTasks = async (req, res) => {
       Task.countDocuments(query)
     ]);
 
-    return res.status(200).json({
+    const responsePayload = {
       success: true,
       totalTasks: totalItems,
       tasks,
       pagination: buildPaginationMeta(totalItems, page, limit)
-    });
+    };
+
+    // Tasks change often — short TTL
+    await setCache(cacheKey, responsePayload, 120);
+
+    return res.status(200).json(responsePayload);
 
   } catch (error) {
 
@@ -153,11 +177,6 @@ export const getAllTasks = async (req, res) => {
 
   }
 };
-
-
-
-
-
 
 
 export const deleteTask = async (req, res) => {
@@ -184,6 +203,10 @@ export const deleteTask = async (req, res) => {
 
     emitToProject(task.projectId, "task:deleted", { taskId: task._id });
 
+    // Cache Invalidation
+
+    await invalidateTaskCaches(req.user.tenantId);
+
     // Response
 
     return res.status(200).json({
@@ -202,10 +225,6 @@ export const deleteTask = async (req, res) => {
 
   }
 };
-
-
-
-
 
 
 export const updateTaskStatus = async (req, res) => {
@@ -257,6 +276,10 @@ export const updateTaskStatus = async (req, res) => {
     });
 
     emitToProject(updatedTask.projectId?._id || updatedTask.projectId, "task:updated", updatedTask);
+
+    // Cache Invalidation
+
+    await invalidateTaskCaches(req.user.tenantId);
 
     // Response
 

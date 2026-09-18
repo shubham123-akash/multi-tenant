@@ -10,20 +10,24 @@ import {
   accessTokenCookieOptions,
   refreshTokenCookieOptions
 } from "../utils/generateTokens.js";
+import { getCache, setCache, deleteCache } from "../utils/cache.js";
+
+const meKey = (userId) => `user:me:${userId}`;
+const allUsersKey = (tenantId) => `users:tenant:${tenantId}:all`;
 
 // register
-export const Register = async(req, res) => {
+export const Register = async (req, res) => {
   try {
-    const {name, email, password, companyName} = req.body;
+    const { name, email, password, companyName } = req.body;
 
-    if(!name || !email || !password || !companyName){
+    if (!name || !email || !password || !companyName) {
       return res.status(400).json({
         message: "All fields are required",
         success: false
       })
     }
 
-    if(password.length < 6){
+    if (password.length < 6) {
       return res.status(400).json({
         message: "Password must be at least 6 characters long"
       })
@@ -56,32 +60,32 @@ export const Register = async(req, res) => {
       success: true
     })
 
-  } catch(error){
+  } catch (error) {
     console.error(error);
 
     return res.status(500).json({
       message: "Internal Server Error",
       success: false
     });
-  }}
+  }
+}
 
 
 // login
-export const Login = async(req, res) => {
+export const Login = async (req, res) => {
   try {
 
-    const {email, password} = req.body;
+    const { email, password } = req.body;
 
-    if(!email || !password){
+    if (!email || !password) {
       return res.status(400).json({
         message: "All fields are required",
         success: false
       })
     }
 
-    // const user = await User.findOne({email, tenantId});
-    const user = await User.findOne({email});
-    if(!user || !user.isActive){
+    const user = await User.findOne({ email });
+    if (!user || !user.isActive) {
       return res.status(401).json({
         message: "Invalid credentials",
         success: false
@@ -89,11 +93,11 @@ export const Login = async(req, res) => {
     }
 
     const isMatch = await bcryptjs.compare(password, user.password);
-    if(!isMatch){
-        return res.status(401).json({
-          message: "Invalid credentials",
-          success: false
-        })
+    if (!isMatch) {
+      return res.status(401).json({
+        message: "Invalid credentials",
+        success: false
+      })
     }
     const tokenData = {
       userId: user._id,
@@ -116,8 +120,8 @@ export const Login = async(req, res) => {
         message: "Login successfully",
         success: true
       })
-        
-    } catch(error){
+
+  } catch (error) {
     console.error(error);
 
     return res.status(500).json({
@@ -168,7 +172,7 @@ export const Logout = async (req, res) => {
 // create users in tenant
 export const createUser = async (req, res) => {
   try {
-    
+
     if (!req.user || !req.user.tenantId) {
       return res.status(401).json({
         message: "Unauthorized User"
@@ -177,14 +181,14 @@ export const createUser = async (req, res) => {
 
     const { name, email, password, role } = req.body;
 
-    if(!name || !email || !password || !role){
+    if (!name || !email || !password || !role) {
       return res.status(400).json({
         message: "All fields are required",
         success: false
       })
     }
 
-    if(password.length < 6){
+    if (password.length < 6) {
       return res.status(400).json({
         message: "Password must be at least 6 characters long"
       })
@@ -203,10 +207,10 @@ export const createUser = async (req, res) => {
       tenantId: req.user.tenantId
     });
 
-    if(existingUser){
+    if (existingUser) {
       return res.status(401).json({
-          message: "User already exist",
-          success: false
+        message: "User already exist",
+        success: false
       })
     }
 
@@ -217,7 +221,7 @@ export const createUser = async (req, res) => {
       email,
       password: hashedPassword,
       role,
-      tenantId: req.user.tenantId 
+      tenantId: req.user.tenantId
     });
 
     await createActivityLog({
@@ -228,6 +232,8 @@ export const createUser = async (req, res) => {
       tenantId: req.user.tenantId
     });
 
+    // Invalidate the tenant's cached user list so the new user shows up
+    await deleteCache(allUsersKey(req.user.tenantId));
 
     return res.status(201).json({
       message: "User created successfully",
@@ -245,10 +251,6 @@ export const createUser = async (req, res) => {
 }
 
 
-
-
-
-
 // Get Logged In User
 export const getMe = async (req, res) => {
   try {
@@ -260,7 +262,19 @@ export const getMe = async (req, res) => {
       });
     }
 
+    const cacheKey = meKey(req.user.userId)
+
+    const cached = await getCache(cacheKey);
+    if (cached) {
+      res.set("X-Cache", "HIT");
+      return res.status(200).json(cached);
+    }
+
     const user = await User.findById(req.user.userId).select("-password");
+
+    // Profile data barely changes and there's no update-profile route yet,
+    // so a plain TTL (no explicit invalidation trigger) is enough here.
+    await setCache(cacheKey, user, 600);
 
     return res.status(200).json(user);
 
@@ -271,9 +285,6 @@ export const getMe = async (req, res) => {
     });
   }
 };
-
-
-
 
 
 // Refresh Access Token
@@ -363,9 +374,21 @@ export const getUsers = async (req, res) => {
       });
     }
 
+    const cacheKey = allUsersKey(req.user.tenantId);
+
+    // NOTE: cached value is an array — return it as-is, don't spread it
+    // (spreading an array with an extra key corrupts it into an object).
+    const cached = await getCache(cacheKey);
+    if (cached) {
+      res.set("X-Cache", "HIT");
+      return res.status(200).json(cached);
+    }
+
     const users = await User.find({
       tenantId: req.user.tenantId
     }).select("-password");
+
+    await setCache(cacheKey, users, 300);
 
     return res.status(200).json(users);
 

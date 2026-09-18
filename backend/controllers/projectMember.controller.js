@@ -4,7 +4,14 @@ import User from "../models/user.model.js";
 import { createActivityLog } from "../utils/createActivityLog.js";
 import { getPagination, buildPaginationMeta } from "../utils/paginate.js";
 import { emitToProject } from "../utils/socket.js";
+import { getCache, setCache, deleteCacheByPattern } from "../utils/cache.js";
 
+const projectMembersKey = (tenantId, projectId, page, limit) =>
+  `project-members:tenant:${tenantId}:project:${projectId}:page:${page}:limit:${limit}`;
+
+const invalidateProjectMemberCaches = async (tenantId, projectId) => {
+  await deleteCacheByPattern(`project-members:tenant:${tenantId}:project:${projectId}:*`);
+};
 
 
 export const assignUser = async (req, res) => {
@@ -34,6 +41,9 @@ export const assignUser = async (req, res) => {
     ]);
 
     emitToProject(req.project._id, "project:memberAssigned", populatedMember);
+
+    // Cache Invalidation
+    await invalidateProjectMemberCaches(req.user.tenantId, req.project._id);
 
     return res.status(201).json({
       success: true,
@@ -84,6 +94,9 @@ export const removeUser = async (req, res) => {
 
     emitToProject(req.project._id, "project:memberRemoved", { userId });
 
+    // Cache Invalidation
+    await invalidateProjectMemberCaches(req.user.tenantId, req.project._id);
+
     return res.status(200).json({
       success: true,
       message: "User removed successfully",
@@ -106,6 +119,14 @@ export const getProjectMembers = async (req, res) => {
 
     const { page, limit, skip } = getPagination(req);
 
+    const cacheKey = projectMembersKey(req.user.tenantId, req.project._id, page, limit);
+
+    const cached = await getCache(cacheKey);
+    if (cached) {
+      res.set("X-Cache", "HIT");
+      return res.status(200).json(cached);
+    }
+
     const filter = {
       projectId: req.project._id,
       tenantId: req.user.tenantId,
@@ -121,12 +142,16 @@ export const getProjectMembers = async (req, res) => {
       ProjectMember.countDocuments(filter)
     ]);
 
-    return res.status(200).json({
+    const responsePayload = {
       success: true,
       totalMembers: totalItems,
       members,
       pagination: buildPaginationMeta(totalItems, page, limit)
-    });
+    };
+
+    await setCache(cacheKey, responsePayload, 300);
+
+    return res.status(200).json(responsePayload);
 
   } catch (error) {
 
