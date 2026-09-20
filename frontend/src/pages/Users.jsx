@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
-import axiosInstance from "../utils/axiosInstance";
+import { useDispatch, useSelector } from "react-redux";
 import toast from "react-hot-toast";
-import { USER_API_END_POINT } from "../utils/Constant";
+
+import { fetchUsers, createUser, selectUsers } from "../features/users/usersSlice";
 
 import UsersHeader from "../components/users/UsersHeader";
 import UsersTable from "../components/users/UsersTable";
@@ -9,7 +10,9 @@ import CreateUserModal from "../components/users/CreateUserModal";
 
 const Users = () => {
 
-  const [users, setUsers] = useState([]);
+  const dispatch = useDispatch();
+  const users = useSelector(selectUsers);
+
   const [showModal, setShowModal] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -19,30 +22,9 @@ const Users = () => {
     role: "MEMBER"
   });
 
-  // 🔥 Fetch all users
-  const fetchUsers = async () => {
-    try {
-      const res = await axiosInstance.get(
-        `${USER_API_END_POINT}/getUsers`,
-        {
-          withCredentials: true,
-        }
-      );
-
-      // If backend returns only array
-      setUsers(res.data);
-
-      // If backend returns { success: true, users: [...] }
-      // setUsers(res.data.users);
-
-    } catch (error) {
-      toast.error("Failed to fetch users");
-    }
-  };
-
   useEffect(() => {
-    fetchUsers();
-  }, []);
+    dispatch(fetchUsers());
+  }, [dispatch]);
 
   const handleChange = (e) => {
     setFormData({
@@ -54,29 +36,15 @@ const Users = () => {
   const handleCreateUser = async (e) => {
     e.preventDefault();
 
-    try {
-      const res = await axiosInstance.post(
-        `${USER_API_END_POINT}/createUsers`,
-        formData,
-        { withCredentials: true }
-      );
+    const result = await dispatch(createUser(formData));
 
-      toast.success(res.data.message);
-
-      // Add newly created user to table
-      setUsers(prev => [...prev, res.data.user]);
-
+    if (createUser.fulfilled.match(result)) {
+      toast.success(result.payload.message);
+      // reducer already pushed result.payload.user into the slice
       setShowModal(false);
-
-      setFormData({
-        name: "",
-        email: "",
-        password: "",
-        role: "MEMBER"
-      });
-
-    } catch (error) {
-      toast.error(error?.response?.data?.message || "Failed to create user");
+      setFormData({ name: "", email: "", password: "", role: "MEMBER" });
+    } else {
+      toast.error(result.payload || "Failed to create user");
     }
   };
 

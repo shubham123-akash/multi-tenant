@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from "react";
-import axiosInstance from "../utils/axiosInstance";
-import {
-  PROJECT_API_END_POINT,
-  TENANT_API_END_POINT,
-  USER_API_END_POINT
-} from "../utils/Constant";
+import { useDispatch, useSelector } from "react-redux";
+
+import { selectTenant } from "../features/tenant/tenantSlice";
+import { selectRole } from "../features/auth/authSlice";
+import { fetchProjects, selectProjects } from "../features/projects/projectsSlice";
+import { fetchUsers, selectUsers } from "../features/users/usersSlice";
 
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import StatsCards from "../components/dashboard/StatsCards";
@@ -14,34 +14,22 @@ import RecentActivity from "../components/dashboard/RecentActivity";
 
 const Dashboard = () => {
 
-  const [projects, setProjects] = useState([]);
-  const [users, setUsers] = useState([]);
-  const [tenant, setTenant] = useState(null);
-  const [role, setRole] = useState("");
+  const dispatch = useDispatch();
+
+  // tenant is fetched once in Navbar (mounted alongside every protected
+  // page via MainLayout), role comes from the /me fetch App-level effect —
+  // Dashboard just reads both instead of re-fetching them
+  const tenant = useSelector(selectTenant);
+  const role = useSelector(selectRole);
+  const projects = useSelector(selectProjects);
+  const users = useSelector(selectUsers);
+
   const [view, setView] = useState("");
 
-  const fetchData = async () => {
-    const [tenantRes, projectRes, userRes, meRes] = await Promise.all([
-      axiosInstance.get(`${TENANT_API_END_POINT}/getTenantInfo`, { withCredentials: true }),
-      axiosInstance.get(`${PROJECT_API_END_POINT}/getAllProjects`, { withCredentials: true }),
-      axiosInstance.get(`${USER_API_END_POINT}/getUsers`, { withCredentials: true }),
-      axiosInstance.get(`${USER_API_END_POINT}/me`, { withCredentials: true })
-    ]);
-
-    console.log("Tenant Response:", tenantRes.data);
-console.log("Project Response:", projectRes.data);
-console.log("User Response:", userRes.data);
-console.log("Me Response:", meRes.data);
-
-    setTenant(tenantRes.data);
-setProjects(projectRes.data.projects); // ✅
-setUsers(userRes.data);                // ✅
-setRole(meRes.data.role);
-  };
-
   useEffect(() => {
-    fetchData();
-  }, []);
+    dispatch(fetchProjects(1));
+    dispatch(fetchUsers());
+  }, [dispatch]);
 
   return (
     <div className="space-y-8">

@@ -1,48 +1,29 @@
-import React, { useEffect, useState } from "react";
-import axiosInstance from "../utils/axiosInstance";
+import React, { useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import { USER_API_END_POINT, TENANT_API_END_POINT } from "../utils/Constant";
+import { fetchTenantInfo, selectTenant } from "../features/tenant/tenantSlice";
+import { logoutUser } from "../features/auth/authSlice";
 
 const Navbar = () => {
 
   const navigate = useNavigate();
-  const [companyName, setCompanyName] = useState("");
-
-  // 🔥 Fetch Tenant Info
-  const fetchTenant = async () => {
-    try {
-      const res = await axiosInstance.get(
-        `${TENANT_API_END_POINT}/getTenantInfo`,
-        { withCredentials: true }
-      );
-
-      console.log("Tenant Response:", res.data);
-
-      setCompanyName(res.data.name);
-
-    } catch (error) {
-      console.log("Failed to load tenant info");
-    }
-  };
+  const dispatch = useDispatch();
+  const tenant = useSelector(selectTenant);
 
   useEffect(() => {
-    fetchTenant();
-  }, []);
+    // only fetched here now — Dashboard.jsx reads the same slice instead
+    // of firing its own request
+    dispatch(fetchTenantInfo());
+  }, [dispatch]);
 
   const handleLogout = async () => {
-    try {
+    const result = await dispatch(logoutUser());
 
-      const res = await axiosInstance.get(`${USER_API_END_POINT}/logout`, {
-        withCredentials: true
-      });
-
-      if (res.data.success) {
-        toast.success(res.data.message);
-        navigate("/login");
-      }
-
-    } catch (error) {
+    if (logoutUser.fulfilled.match(result)) {
+      toast.success(result.payload.message);
+      navigate("/login");
+    } else {
       toast.error("Logout failed");
     }
   };
@@ -58,7 +39,7 @@ const Navbar = () => {
 
         {/* 🔹 Company Name */}
         <span className="text-gray-600 text-sm font-medium">
-          {companyName ? `welcome to , ${companyName}` : "Loading..."}
+          {tenant ? `welcome to , ${tenant.name}` : "Loading..."}
         </span>
 
         <button

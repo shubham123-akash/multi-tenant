@@ -1,41 +1,31 @@
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import axiosInstance from "../utils/axiosInstance";
-import { USER_API_END_POINT } from '../utils/Constant';
+import { useDispatch, useSelector } from 'react-redux'
 import toast from "react-hot-toast";
+import { loginUser, selectAuthStatus } from '../features/auth/authSlice';
 
 const Login = () => {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [tenantId, setTenantId] = useState("");
-  const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
+  const dispatch = useDispatch();
+  const status = useSelector(selectAuthStatus);
+  const loading = status === "loading";
   const navigate = useNavigate();
 
-  const getInputData = async(e) => {
+  const getInputData = async (e) => {
     e.preventDefault();
-    setLoading(true);
 
-    const user = {email, password};
+    const result = await dispatch(loginUser({ email, password }));
 
-    try {
-      const res = await axiosInstance.post(`${USER_API_END_POINT}/login`, user, {
-        headers: { 'Content-Type': 'application/json' },
-        withCredentials: true
-      });
-
-      if(res.data.success){
-        toast.success(res.data.message);
-        navigate("/");
-      }
-
-    } catch (error) {
-      toast.error(error.response?.data?.message || "Login failed");
+    if (loginUser.fulfilled.match(result)) {
+      toast.success(result.payload.message);
+      navigate("/");
+    } else {
+      toast.error(result.payload || "Login failed");
     }
-
-    setLoading(false);
   }
 
   return (
@@ -69,7 +59,7 @@ const Login = () => {
               <label className="text-gray-600 text-sm">Email</label>
               <input
                 value={email}
-                onChange={(e)=>setEmail(e.target.value)}
+                onChange={(e) => setEmail(e.target.value)}
                 type="email"
                 placeholder="Enter your email"
                 className="w-full mt-1 px-4 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -83,7 +73,7 @@ const Login = () => {
               <div className="relative">
                 <input
                   value={password}
-                  onChange={(e)=>setPassword(e.target.value)}
+                  onChange={(e) => setPassword(e.target.value)}
                   type={showPassword ? "text" : "password"}
                   placeholder="Enter your password"
                   className="w-full mt-1 px-4 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -97,19 +87,6 @@ const Login = () => {
                 </span>
               </div>
             </div>
-
-            {/* Tenant ID */}
-            {/* <div>
-              <label className="text-gray-600 text-sm">Tenant ID</label>
-              <input
-                value={tenantId}
-                onChange={(e)=>setTenantId(e.target.value)}
-                type="text"
-                placeholder="Enter tenant ID"
-                className="w-full mt-1 px-4 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                required
-              />
-            </div> */}
 
             {/* Login Button */}
             <button
@@ -126,7 +103,7 @@ const Login = () => {
 
             {/* Signup */}
             <p className="text-center text-gray-600 text-sm">
-              Don’t have an account?{" "}
+              Don't have an account?{" "}
               <Link to="/register" className="text-indigo-600 font-semibold hover:underline">
                 Signup
               </Link>
